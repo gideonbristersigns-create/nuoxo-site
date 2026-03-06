@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import useSampleRecords from "./hooks/useSampleRecords.js";
 import useApplicationForm from "./hooks/useApplicationForm.js";
+import useSearch from "./hooks/useSearch.js";
 
 const C = {
   bg:"#FFFBF5", surface:"#FFFFFF", surfAlt:"#F9F5EE",
@@ -10,7 +11,64 @@ const C = {
   border:"#E7E0D6", borderLt:"#F0EBE3",
 };
 
-function DashboardMockup({ liveRecords }) {
+function RecordDetailModal({ record, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  if (!record) return null;
+
+  const fields = [
+    { label: "Permit ID", value: record.permit_id },
+    { label: "City", value: record.city },
+    { label: "County", value: record.county },
+    { label: "Type", value: record.permit_type },
+    { label: "Status", value: record.status },
+    { label: "Estimated Value", value: record.value_range },
+    { label: "Issue Date", value: record.issue_date || "\u2014" },
+    { label: "Address", value: record.address },
+    { label: "Owner", value: record.owner_name || "\u2014" },
+    { label: "Contractor", value: record.contractor_name || "\u2014" },
+  ];
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed",inset:0,zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(28,25,23,0.5)",backdropFilter:"blur(6px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:C.surface,borderRadius:18,border:`1px solid ${C.border}`,maxWidth:520,width:"90%",maxHeight:"85vh",overflow:"auto",boxShadow:"0 32px 80px rgba(28,25,23,0.18)",animation:"fadeUp 0.3s ease-out" }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"20px 24px",borderBottom:`1px solid ${C.borderLt}` }}>
+          <div style={{ fontSize:16,fontWeight:700,color:C.text }}>Record Detail</div>
+          <span onClick={onClose} style={{ cursor:"pointer",fontSize:20,color:C.textSoft,lineHeight:1 }}>&times;</span>
+        </div>
+        <div style={{ padding:"20px 24px" }}>
+          {fields.map((f, i) => (
+            <div key={i} style={{ display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:i < fields.length - 1 ? `1px solid ${C.borderLt}` : "none" }}>
+              <span style={{ fontSize:13,color:C.textSoft,fontWeight:600 }}>{f.label}</span>
+              <span style={{ fontSize:13,color:C.text,fontWeight:500,textAlign:"right",maxWidth:"60%" }}>{f.value}</span>
+            </div>
+          ))}
+          {record.description && (
+            <div style={{ marginTop:16 }}>
+              <div style={{ fontSize:13,color:C.textSoft,fontWeight:600,marginBottom:6 }}>Description</div>
+              <div style={{ fontSize:13,color:C.text,lineHeight:1.6,background:C.surfAlt,padding:"12px 14px",borderRadius:10,border:`1px solid ${C.borderLt}` }}>
+                {record.description}{record.description.length >= 120 ? "..." : ""}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding:"16px 24px 24px",borderTop:`1px solid ${C.borderLt}` }}>
+          <div style={{ fontSize:12,color:C.textFade,marginBottom:12,textAlign:"center" }}>Some details are redacted in this preview.</div>
+          <button onClick={() => { onClose(); scrollTo("cta"); }} style={{ width:"100%",background:C.accent,color:"#FFF",border:"none",borderRadius:12,padding:"14px 24px",fontSize:15,fontWeight:700,cursor:"pointer",transition:"all 0.2s",boxShadow:"0 2px 12px rgba(22,120,94,0.15)" }}
+            onMouseEnter={e => e.target.style.boxShadow="0 4px 20px rgba(22,120,94,0.25)"}
+            onMouseLeave={e => e.target.style.boxShadow="0 2px 12px rgba(22,120,94,0.15)"}
+          >Want full details? Request access</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardMockup({ liveRecords, search }) {
   const [tab, setTab] = useState("records");
   const tabData = {
     records: liveRecords,
@@ -43,7 +101,12 @@ function DashboardMockup({ liveRecords }) {
     api:["Method","Endpoint","Response","Latency","Status","\u2014"],
   };
   const stC = { active:C.accent, review:C.warm, complete:C.textFade };
-  const rows = tabData[tab]; const h = hdrs[tab];
+  // When on records tab with search results, show them instead of sample data
+  const hasSearchResults = tab === "records" && search.status === "done" && search.results.length > 0;
+  const searchRows = hasSearchResults ? search.results.map(r => ({
+    c1: r.permit_id, c2: r.address, c3: r.permit_type || r.city, c4: r.value_range, st: r.status === "Issued" || r.status === "Active" ? "active" : r.status === "Under Review" ? "review" : "complete", c6: r.issue_date ? r.issue_date.slice(5) : "\u2014", _raw: r,
+  })) : null;
+  const rows = searchRows || tabData[tab]; const h = hdrs[tab];
 
   return (
     <div style={{
@@ -80,24 +143,64 @@ function DashboardMockup({ liveRecords }) {
         </div>
       </div>
       <div style={{ padding:"10px 20px", borderBottom:`1px solid ${C.borderLt}`, display:"flex", alignItems:"center", gap:10 }}>
-        <div style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.textSoft,flex:"1 1 200px" }}>
-          Search {tab}, addresses, entities...
-        </div>
-        <div style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.textMid,fontWeight:500 }}>
-          All Jurisdictions &#9662;
-        </div>
+        {tab === "records" ? (
+          <input
+            type="text"
+            value={search.query}
+            onChange={e => search.handleQueryChange(e.target.value)}
+            placeholder="Search permits, addresses, owners..."
+            style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.text,flex:"1 1 200px",outline:"none",transition:"border-color 0.2s" }}
+            onFocus={e => e.target.style.borderColor=C.accent}
+            onBlur={e => e.target.style.borderColor=C.border}
+          />
+        ) : (
+          <div style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.textSoft,flex:"1 1 200px" }}>
+            Search {tab}, addresses, entities...
+          </div>
+        )}
+        {tab === "records" ? (
+          <div style={{ display:"flex",gap:0,borderRadius:8,overflow:"hidden",border:`1px solid ${C.border}` }}>
+            {[{k:"all",l:"All"},{k:"address",l:"Address"},{k:"owner",l:"Owner"},{k:"contractor",l:"Contractor"}].map(t => (
+              <span key={t.k} onClick={() => search.handleTypeChange(t.k)}
+                style={{
+                  padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:search.searchType===t.k?700:400,
+                  background:search.searchType===t.k?C.accent:"transparent",
+                  color:search.searchType===t.k?"#FFF":C.textMid,transition:"all 0.15s",
+                }}
+              >{t.l}</span>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.textMid,fontWeight:500 }}>
+            All Jurisdictions &#9662;
+          </div>
+        )}
         <div style={{ padding:"7px 14px",background:C.accent,borderRadius:8,fontSize:13,color:"#FFF",fontWeight:600 }}>Export</div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"100px 1fr 130px 70px 68px 44px", padding:"9px 20px", fontSize:11, color:C.textFade, fontWeight:700, textTransform:"uppercase", letterSpacing:0.8, borderBottom:`1px solid ${C.borderLt}` }}>
         {h.map((x,i)=><span key={i}>{x}</span>)}
       </div>
-      {rows.map((p,i)=>(
+      {tab === "records" && search.query.length > 0 && search.query.length < 3 && (
+        <div style={{ padding:"20px",textAlign:"center",fontSize:13,color:C.textSoft }}>Type at least 3 characters...</div>
+      )}
+      {tab === "records" && search.status === "loading" && (
+        <div style={{ padding:"20px",textAlign:"center",fontSize:13,color:C.accent }}>Searching...</div>
+      )}
+      {tab === "records" && search.status === "done" && search.results.length === 0 && search.query.length >= 3 && (
+        <div style={{ padding:"20px",textAlign:"center",fontSize:13,color:C.textSoft }}>No records found</div>
+      )}
+      {tab === "records" && search.status === "error" && (
+        <div style={{ padding:"20px",textAlign:"center",fontSize:13,color:C.warm }}>Search failed. Try again.</div>
+      )}
+      {!(tab === "records" && ((search.query.length > 0 && search.query.length < 3) || search.status === "loading" || (search.status === "done" && search.results.length === 0 && search.query.length >= 3) || search.status === "error")) && rows.map((p,i)=>(
         <div key={`${tab}-${i}`} style={{
           display:"grid", gridTemplateColumns:"100px 1fr 130px 70px 68px 44px",
           padding:"11px 20px", fontSize:13, alignItems:"center",
           borderBottom:i<rows.length-1?`1px solid ${C.borderLt}`:"none",
           transition:"background 0.15s",
+          cursor:p._raw?"pointer":"default",
         }}
+          onClick={() => { if (p._raw) search.setSelectedRecord(p._raw); }}
           onMouseEnter={e=>e.currentTarget.style.background=C.surfAlt}
           onMouseLeave={e=>e.currentTarget.style.background="transparent"}
         >
@@ -113,7 +216,7 @@ function DashboardMockup({ liveRecords }) {
         </div>
       ))}
       <div style={{ padding:"10px 20px",background:C.surfAlt,display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.borderLt}` }}>
-        <span style={{ fontSize:12,color:C.textSoft }}>Sample of indexed {tab}</span>
+        <span style={{ fontSize:12,color:C.textSoft }}>{hasSearchResults ? `${search.results.length} result${search.results.length !== 1 ? "s" : ""} (redacted)` : `Sample of indexed ${tab}`}</span>
         <span style={{ fontSize:12,color:C.accent,fontWeight:600,cursor:"pointer" }}>View all &#8594;</span>
       </div>
     </div>
@@ -186,6 +289,7 @@ const VERTICALS = [
 export default function NuoxoFinal() {
   const liveRecords = useSampleRecords();
   const form = useApplicationForm();
+  const search = useSearch();
 
   const [scrollY, setScrollY] = useState(0);
   useEffect(()=>{const h=()=>setScrollY(window.scrollY);window.addEventListener("scroll",h,{passive:true});return()=>window.removeEventListener("scroll",h);},[]);
@@ -271,7 +375,7 @@ export default function NuoxoFinal() {
         </div>
       </section>
 
-      <section style={{ maxWidth:1200,margin:"0 auto",padding:"20px 40px 80px",animation:"fadeUp 0.9s ease-out 0.15s both" }}><DashboardMockup liveRecords={liveRecords}/></section>
+      <section style={{ maxWidth:1200,margin:"0 auto",padding:"20px 40px 80px",animation:"fadeUp 0.9s ease-out 0.15s both" }}><DashboardMockup liveRecords={liveRecords} search={search}/></section>
 
       <section style={{ maxWidth:900,margin:"0 auto",padding:"48px 40px",display:"flex",justifyContent:"center",gap:64,flexWrap:"wrap" }}>
         {[{val:"Millions",label:"of records your competitors can see"},{val:"Nationwide",label:"coverage expanding weekly"},{val:"Minutes",label:"head start on every filing"},{val:"Limited",label:"partners accepted per market"}].map((s,i)=>(
@@ -509,6 +613,10 @@ export default function NuoxoFinal() {
         </div>
         <span style={{ fontSize:12,color:C.textFade }}>Vero Beach, Florida</span>
       </footer>
+
+      {search.selectedRecord && (
+        <RecordDetailModal record={search.selectedRecord} onClose={() => search.setSelectedRecord(null)} />
+      )}
     </div>
   );
 }
