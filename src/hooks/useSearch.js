@@ -27,14 +27,26 @@ function formatAge(dateStr) {
   return `${years}y`;
 }
 
+const TYPE_META = {
+  permit:     { label: "Permit",     color: "#16785E" },
+  property:   { label: "Property",   color: "#2563EB" },
+  business:   { label: "Business",   color: "#7C3AED" },
+  contractor: { label: "Contractor", color: "#D97706" },
+  lien:       { label: "Lien",       color: "#DC2626" },
+  violation:  { label: "Violation",  color: "#EA580C" },
+};
+
 function mapResult(r) {
+  const meta = TYPE_META[r.source_type] || { label: r.source_type || "Record", color: "#78716C" };
   return {
-    c1: r.permit_id || "\u2014",
-    c2: r.address || r.city || "\u2014",
-    c3: r.permit_type || "\u2014",
-    c4: r.value_range || "\u2014",
-    st: normalizeStatus(r.status),
-    c6: formatAge(r.issue_date),
+    c1: r.record_id || "\u2014",
+    c2: r.display_line1 || "\u2014",
+    c3: meta.label,
+    c4: r.detail1 || r.detail3 || "\u2014",
+    st: normalizeStatus(r.detail2),
+    c6: formatAge(r.date_field),
+    sourceType: r.source_type,
+    typeColor: meta.color,
   };
 }
 

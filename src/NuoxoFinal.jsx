@@ -47,9 +47,10 @@ function DashboardMockup({ liveRecords }) {
     analytics:["Region","Jurisdiction","Category","Change","Trend","Period"],
     api:["Method","Endpoint","Response","Latency","Status","\u2014"],
   };
+  const searchHdrs = ["ID", "Name / Address", "Type", "Detail", "Status", "Date"];
   const stC = { active:C.accent, review:C.warm, complete:C.textFade };
   const rows = showSearchResults ? search.results : tabData[tab];
-  const h = hdrs[tab];
+  const h = showSearchResults ? searchHdrs : hdrs[tab];
 
   // Determine search bar display state
   const showAutoType = isRecordsTab && !search.autoTypeDone && !search.query;
@@ -158,7 +159,20 @@ function DashboardMockup({ liveRecords }) {
         >
           <span style={{ fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:tab==="api"?C.warm:C.accent,fontWeight:500 }}>{p.c1}</span>
           <span style={{ fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.c2}</span>
-          <span style={{ color:C.textSoft,fontSize:12 }}>{p.c3}</span>
+          <span style={{ color:C.textSoft,fontSize:12 }}>
+            {showSearchResults && p.typeColor ? (
+              <span style={{
+                display:"inline-block",
+                padding:"2px 8px",
+                borderRadius:4,
+                fontSize:10,
+                fontWeight:600,
+                color:"#FFF",
+                background:p.typeColor,
+                letterSpacing:0.3,
+              }}>{p.c3}</span>
+            ) : p.c3}
+          </span>
           <span style={{ fontWeight:700,color:tab==="analytics"?(p.c4.startsWith("+") ? C.accent : p.c4.startsWith("-") ? C.warm : C.text) : C.text }}>{p.c4}</span>
           <span style={{ display:"flex",alignItems:"center",gap:5 }}>
             <span style={{ width:6,height:6,borderRadius:"50%",background:stC[p.st] }} />
