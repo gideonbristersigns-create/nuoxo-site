@@ -8,9 +8,9 @@ const ERASE_SPEED = 40;
 
 function normalizeStatus(raw) {
   if (!raw) return "complete";
-  const s = raw.toLowerCase();
-  if (s === "issued" || s === "active" || s === "approved") return "active";
-  if (s === "pending" || s === "review" || s === "under review") return "review";
+  const s = raw.toLowerCase().replace(/[^a-z ]/g, "").trim();
+  if (s.includes("issued") || s.includes("active") || s.includes("approved") || s === "a" || s.includes("open")) return "active";
+  if (s.includes("pending") || s.includes("review") || s.includes("hold")) return "review";
   return "complete";
 }
 
