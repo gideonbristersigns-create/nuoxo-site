@@ -202,7 +202,7 @@ export default function NuoxoFinal() {
       const container = document.getElementById("turnstile-container");
       if (container && window.turnstile && !container.hasChildNodes()) {
         window.turnstile.render("#turnstile-container", {
-          sitekey: "0x4AAAAAAA_REPLACE_WITH_REAL_SITEKEY",
+          sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAACm7xdDQonaxMXy3",
           callback: onTurnstileCallback,
           theme: "light",
         });
