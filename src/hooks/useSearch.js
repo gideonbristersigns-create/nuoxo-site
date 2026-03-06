@@ -1,80 +1,153 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://api.nuoxo.com";
+const AUTO_TYPE_TEXT = "vero beach building permit";
+const TYPE_SPEED = 70;
+const HOLD_TIME = 1500;
+const ERASE_SPEED = 40;
+
+function normalizeStatus(raw) {
+  if (!raw) return "complete";
+  const s = raw.toLowerCase();
+  if (s === "issued" || s === "active" || s === "approved") return "active";
+  if (s === "pending" || s === "review" || s === "under review") return "review";
+  return "complete";
+}
+
+function formatAge(dateStr) {
+  if (!dateStr) return "\u2014";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 0) return "now";
+  const days = Math.floor(diff / 86400000);
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  const years = Math.floor(days / 365);
+  return `${years}y`;
+}
+
+function mapResult(r) {
+  return {
+    c1: r.permit_id || "\u2014",
+    c2: r.address || r.city || "\u2014",
+    c3: r.permit_type || "\u2014",
+    c4: r.value_range || "\u2014",
+    st: normalizeStatus(r.status),
+    c6: formatAge(r.issue_date),
+  };
+}
 
 export default function useSearch() {
   const [query, setQuery] = useState("");
-  const [searchType, setSearchType] = useState("all");
-  const [results, setResults] = useState([]);
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
-  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [results, setResults] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Auto-type state
+  const [autoTypeText, setAutoTypeText] = useState("");
+  const [autoTypeDone, setAutoTypeDone] = useState(false);
 
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const executeSearch = useCallback((q, type) => {
-    // Cancel any in-flight request
+  // Auto-typing animation on mount
+  useEffect(() => {
+    let cancelled = false;
+    let timeout;
+
+    async function animate() {
+      // Type forward
+      for (let i = 0; i <= AUTO_TYPE_TEXT.length; i++) {
+        if (cancelled) return;
+        await new Promise(r => { timeout = setTimeout(r, TYPE_SPEED); });
+        if (cancelled) return;
+        setAutoTypeText(AUTO_TYPE_TEXT.slice(0, i));
+      }
+      // Hold
+      await new Promise(r => { timeout = setTimeout(r, HOLD_TIME); });
+      if (cancelled) return;
+      // Erase
+      for (let i = AUTO_TYPE_TEXT.length; i >= 0; i--) {
+        if (cancelled) return;
+        await new Promise(r => { timeout = setTimeout(r, ERASE_SPEED); });
+        if (cancelled) return;
+        setAutoTypeText(AUTO_TYPE_TEXT.slice(0, i));
+      }
+      if (!cancelled) setAutoTypeDone(true);
+    }
+
+    animate();
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (controllerRef.current) controllerRef.current.abort();
 
-    if (!q || q.length < 3) {
-      setResults([]);
-      setStatus("idle");
+    if (!query || query.length < 3) {
+      setResults(null);
+      setIsLoading(false);
+      setError(null);
       return;
     }
 
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setStatus("loading");
+    setIsLoading(true);
+    setError(null);
 
-    const params = new URLSearchParams({ q, type });
-    fetch(`${API_URL}/public/search?${params}`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        setResults(data.results || []);
-        setStatus("done");
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        setResults([]);
-        setStatus("error");
-      });
-  }, []);
-
-  const handleQueryChange = useCallback((value) => {
-    setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      executeSearch(value, searchType);
+      const controller = new AbortController();
+      controllerRef.current = controller;
+
+      const params = new URLSearchParams({ q: query, type: "all" });
+      fetch(`${API_URL}/public/search?${params}`, { signal: controller.signal })
+        .then(res => {
+          if (res.status === 429) throw new Error("Too many searches. Please wait a moment.");
+          if (!res.ok) throw new Error("Search unavailable.");
+          return res.json();
+        })
+        .then(data => {
+          if (!controller.signal.aborted) {
+            const mapped = (data.results || []).map(mapResult);
+            setResults(mapped);
+            setIsLoading(false);
+          }
+        })
+        .catch(err => {
+          if (err.name === "AbortError") return;
+          setError(err.message || "Search unavailable.");
+          setResults(null);
+          setIsLoading(false);
+        });
     }, 300);
-  }, [searchType, executeSearch]);
 
-  const handleTypeChange = useCallback((type) => {
-    setSearchType(type);
-    if (query.length >= 3) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      executeSearch(query, type);
-    }
-  }, [query, executeSearch]);
-
-  // Cleanup on unmount
-  useEffect(() => {
     return () => {
-      if (controllerRef.current) controllerRef.current.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (controllerRef.current) controllerRef.current.abort();
     };
+  }, [query]);
+
+  const clear = useCallback(() => {
+    setQuery("");
+    setResults(null);
+    setIsLoading(false);
+    setError(null);
   }, []);
+
+  const isSearching = query.length >= 3;
+  const resultCount = results ? results.length : 0;
 
   return {
     query,
-    searchType,
+    setQuery,
     results,
-    status,
-    selectedRecord,
-    setSelectedRecord,
-    handleQueryChange,
-    handleTypeChange,
+    isSearching,
+    isLoading,
+    error,
+    resultCount,
+    clear,
+    autoTypeText,
+    autoTypeDone,
   };
 }
