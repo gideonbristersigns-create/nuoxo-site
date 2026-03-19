@@ -28,12 +28,16 @@ function formatAge(dateStr) {
 }
 
 const TYPE_META = {
-  permit:     { label: "Permit",     color: "#16785E" },
-  property:   { label: "Property",   color: "#2563EB" },
-  business:   { label: "Business",   color: "#7C3AED" },
-  contractor: { label: "Contractor", color: "#D97706" },
-  lien:       { label: "Lien",       color: "#DC2626" },
-  violation:  { label: "Violation",  color: "#EA580C" },
+  permit:       { label: "Permit",       color: "#16785E" },
+  property:     { label: "Property",     color: "#2563EB" },
+  business:     { label: "Business",     color: "#7C3AED" },
+  contractor:   { label: "Contractor",   color: "#D97706" },
+  lien:         { label: "Lien",         color: "#DC2626" },
+  violation:    { label: "Violation",    color: "#EA580C" },
+  owner:        { label: "Owner",        color: "#0369A1" },
+  cfo_license:  { label: "CFO License",  color: "#6D28D9" },
+  dbpr_license: { label: "DBPR License", color: "#9333EA" },
+  sale:         { label: "Sale",         color: "#0891B2" },
 };
 
 function mapResult(r) {
@@ -55,6 +59,8 @@ export default function useSearch() {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [jurisdiction, setJurisdiction] = useState("");
+  const [jurisdictions, setJurisdictions] = useState([]);
 
   // Auto-type state
   const [autoTypeText, setAutoTypeText] = useState("");
@@ -62,6 +68,14 @@ export default function useSearch() {
 
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
+
+  // Fetch jurisdictions list on mount
+  useEffect(() => {
+    fetch(`${API_URL}/public/jurisdictions`)
+      .then(res => res.ok ? res.json() : { jurisdictions: [] })
+      .then(data => setJurisdictions(data.jurisdictions || []))
+      .catch(() => {});
+  }, []);
 
   // Auto-typing animation on mount
   useEffect(() => {
@@ -113,6 +127,7 @@ export default function useSearch() {
       controllerRef.current = controller;
 
       const params = new URLSearchParams({ q: query, type: "all" });
+      if (jurisdiction) params.set("jurisdiction", jurisdiction);
       fetch(`${API_URL}/public/search?${params}`, { signal: controller.signal })
         .then(res => {
           if (res.status === 429) throw new Error("Too many searches. Please wait a moment.");
@@ -138,7 +153,7 @@ export default function useSearch() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (controllerRef.current) controllerRef.current.abort();
     };
-  }, [query]);
+  }, [query, jurisdiction]);
 
   const clear = useCallback(() => {
     setQuery("");
@@ -161,5 +176,8 @@ export default function useSearch() {
     clear,
     autoTypeText,
     autoTypeDone,
+    jurisdiction,
+    setJurisdiction,
+    jurisdictions,
   };
 }

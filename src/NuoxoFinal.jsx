@@ -126,9 +126,19 @@ function DashboardMockup({ liveRecords }) {
             >&times;</span>
           )}
         </div>
-        <div style={{ padding:"7px 14px",background:C.surfAlt,border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.textMid,fontWeight:500 }}>
-          All Jurisdictions &#9662;
-        </div>
+        <select
+          value={search.jurisdiction}
+          onChange={e => search.setJurisdiction(e.target.value)}
+          style={{
+            padding:"7px 14px",background:C.surfAlt,border:`1px solid ${search.jurisdiction ? C.accent : C.border}`,
+            borderRadius:8,fontSize:13,color:search.jurisdiction ? C.accent : C.textMid,fontWeight:500,
+            cursor:"pointer",outline:"none",appearance:"auto",
+            transition:"border-color 0.2s",
+          }}
+        >
+          <option value="">All Jurisdictions</option>
+          {search.jurisdictions.map(j => <option key={j} value={j}>{j}</option>)}
+        </select>
         <div style={{ padding:"7px 14px",background:C.accent,borderRadius:8,fontSize:13,color:"#FFF",fontWeight:600 }}>Export</div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"100px 1fr 130px 70px 68px 44px", padding:"9px 20px", fontSize:11, color:C.textFade, fontWeight:700, textTransform:"uppercase", letterSpacing:0.8, borderBottom:`1px solid ${C.borderLt}` }}>
