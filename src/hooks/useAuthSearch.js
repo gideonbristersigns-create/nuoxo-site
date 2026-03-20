@@ -106,7 +106,16 @@ export default function useAuthSearch(getToken) {
         })
         .then(data => {
           if (!controller.signal.aborted) {
-            setResults((data.results || []).map(mapResult));
+            const mapped = (data.results || []).map(mapResult);
+            // Deduplicate by sourceType+recordId
+            const seen = new Set();
+            const unique = mapped.filter(r => {
+              const key = `${r.sourceType}-${r.recordId}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            setResults(unique);
             setIsLoading(false);
           }
         })

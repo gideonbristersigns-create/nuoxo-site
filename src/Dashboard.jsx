@@ -341,7 +341,7 @@ export default function Dashboard({ user, onLogout, getToken }) {
           {!search.isLoading && !search.error && search.results && search.results.length > 0 && (
             <>
               {search.results.map((p, i) => (
-                <div key={i}
+                <div key={`${p.sourceType}-${p.recordId}-${i}`}
                   onClick={() => openRecord(p.sourceType, p.recordId)}
                   style={{
                     display: "grid", gridTemplateColumns: "140px 1fr 110px 140px 80px 60px",
