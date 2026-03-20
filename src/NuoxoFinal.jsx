@@ -319,8 +319,9 @@ export default function NuoxoFinal({ onLoginClick }) {
             <span key={i} onClick={()=>scrollTo(n.id)} style={{ color:C.textSoft,fontSize:14,fontWeight:600,cursor:"pointer",transition:"color 0.2s" }}
               onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.textSoft}>{n.l}</span>
           ))}
-          <span onClick={onLoginClick} style={{ color:C.textSoft,fontSize:14,fontWeight:600,cursor:"pointer",transition:"color 0.2s" }}
-            onMouseEnter={e=>e.currentTarget.style.color=C.accent} onMouseLeave={e=>e.currentTarget.style.color=C.textSoft}>Log in</span>
+          <button onClick={onLoginClick} style={{ background:"transparent",color:C.accent,border:`2px solid ${C.accent}`,borderRadius:10,padding:"10px 22px",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all 0.2s" }}
+            onMouseEnter={e=>{e.target.style.background=C.accent;e.target.style.color="#FFF";}}
+            onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.color=C.accent;}}>Log in</button>
           <button onClick={()=>scrollTo("cta")} style={{ background:C.accent,color:"#FFF",border:"none",borderRadius:10,padding:"10px 22px",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all 0.2s",boxShadow:"0 2px 8px rgba(22,120,94,0.15)" }}
             onMouseEnter={e=>{e.target.style.transform="translateY(-1px)";e.target.style.boxShadow="0 4px 16px rgba(22,120,94,0.25)";}}
             onMouseLeave={e=>{e.target.style.transform="translateY(0)";e.target.style.boxShadow="0 2px 8px rgba(22,120,94,0.15)";}}>Apply now</button>
