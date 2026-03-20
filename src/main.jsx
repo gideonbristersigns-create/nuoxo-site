@@ -23,7 +23,7 @@ function App() {
 
   // Authenticated — show dashboard
   if (auth.user) {
-    return <Dashboard user={auth.user} onLogout={auth.logout} />;
+    return <Dashboard user={auth.user} onLogout={auth.logout} getToken={auth.getToken} />;
   }
 
   // Login page
